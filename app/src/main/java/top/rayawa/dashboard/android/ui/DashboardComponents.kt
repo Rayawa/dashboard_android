@@ -3,6 +3,7 @@ package top.rayawa.dashboard.android.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,10 +36,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +80,22 @@ fun formatDuration(seconds: Long): String {
         if (minutes > 0 || hours > 0) append("${minutes}分")
         append("${secs}秒")
     }
+}
+
+@Composable
+fun ResourceIcon(
+    @DrawableRes drawable: Int,
+    contentDescription: String?,
+    modifier: Modifier = Modifier.size(24.dp),
+    tint: Color? = null,
+) {
+    Image(
+        painter = painterResource(drawable),
+        contentDescription = contentDescription,
+        modifier = modifier,
+        colorFilter = tint?.let(ColorFilter::tint),
+        contentScale = ContentScale.Fit,
+    )
 }
 
 @Composable
@@ -154,7 +174,16 @@ fun ErrorPane(message: String, retry: () -> Unit, modifier: Modifier = Modifier)
         Spacer(Modifier.height(6.dp))
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = retry) { Text("重试") }
+        OutlinedButton(onClick = retry) {
+            ResourceIcon(
+                top.rayawa.dashboard.android.R.drawable.harmony_refresh,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("重试")
+        }
     }
 }
 

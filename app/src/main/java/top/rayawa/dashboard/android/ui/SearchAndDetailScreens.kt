@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import top.rayawa.dashboard.android.R
 import kotlinx.coroutines.launch
 import top.rayawa.dashboard.android.data.AppDetail
 import top.rayawa.dashboard.android.data.DashboardApi
@@ -96,8 +98,16 @@ fun SearchScreen(openDetail: (MarketApp) -> Unit, modifier: Modifier = Modifier)
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { search() }, enabled = !loading && query.isNotBlank()) { Text(if (loading) "搜索中…" else "搜索") }
-                OutlinedButton(onClick = { showSubmit = true }) { Text("提交收录") }
+                Button(onClick = { search() }, enabled = !loading && query.isNotBlank()) {
+                    ResourceIcon(R.drawable.harmony_search, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (loading) "搜索中…" else "搜索")
+                }
+                OutlinedButton(onClick = { showSubmit = true }) {
+                    ResourceIcon(R.drawable.harmony_submit, null, Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.size(8.dp))
+                    Text("提交收录")
+                }
             }
         }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
@@ -165,7 +175,11 @@ private fun SubmitDialog(initial: String, onDismiss: () -> Unit, onSubmitted: (M
                         loading = false
                     }
                 },
-            ) { Text(if (loading) "提交中…" else "提交") }
+            ) {
+                ResourceIcon(R.drawable.harmony_submit, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onPrimary)
+                Spacer(Modifier.size(8.dp))
+                Text(if (loading) "提交中…" else "提交")
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
@@ -216,13 +230,25 @@ fun AppDetailScreen(
                 Text(app.name, style = MaterialTheme.typography.headlineMedium)
                 Text(app.developerName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { openUrl(context, "https://appgallery.huawei.com/app/detail?id=${app.appId}") }) { Text("应用市场") }
-                    if (app.privacyUrl.isNotBlank()) OutlinedButton(onClick = { openUrl(context, app.privacyUrl) }) { Text("隐私政策") }
+                    Button(onClick = { openUrl(context, "https://appgallery.huawei.com/app/detail?id=${app.appId}") }) {
+                        ResourceIcon(R.drawable.harmony_start_icon, null, Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("应用市场")
+                    }
+                    if (app.privacyUrl.isNotBlank()) OutlinedButton(onClick = { openUrl(context, app.privacyUrl) }) {
+                        ResourceIcon(R.drawable.harmony_privacy, null, Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.size(8.dp))
+                        Text("隐私政策")
+                    }
                     OutlinedButton(onClick = {
                         val share = Intent(Intent.ACTION_SEND).setType("text/plain")
                             .putExtra(Intent.EXTRA_TEXT, "${app.name}\n${DashboardApi.PUBLIC_SITE_URL}dashboard?app_id=${app.appId}")
                         context.startActivity(Intent.createChooser(share, "分享应用"))
-                    }) { Text("分享") }
+                    }) {
+                        ResourceIcon(R.drawable.harmony_share, null, Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.size(8.dp))
+                        Text("分享")
+                    }
                 }
             }
         }

@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -29,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -41,6 +44,7 @@ import top.rayawa.dashboard.android.ui.AppsScreen
 import top.rayawa.dashboard.android.ui.HomeScreen
 import top.rayawa.dashboard.android.ui.ImportantNoticeDialog
 import top.rayawa.dashboard.android.ui.ProfileScreen
+import top.rayawa.dashboard.android.ui.ResourceIcon
 import top.rayawa.dashboard.android.ui.SStationScreen
 import top.rayawa.dashboard.android.ui.SearchScreen
 import top.rayawa.dashboard.android.ui.theme.DashboardAndroidTheme
@@ -63,8 +67,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class MainTab(val title: String, val symbol: String) {
-    S_STATION("S站", "◎"), HOME("首页", "⌂"), APPS("详情", "▦"), PROFILE("我的", "♙")
+private enum class MainTab(val title: String, val drawable: Int, val tintable: Boolean = true) {
+    S_STATION("S站", R.drawable.harmony_globe),
+    HOME("首页", R.drawable.harmony_start_icon, false),
+    APPS("详情", R.drawable.harmony_api),
+    PROFILE("我的", R.drawable.harmony_user),
 }
 
 private sealed interface AppRoute {
@@ -132,14 +139,33 @@ private fun DashboardApp(incomingLink: Uri?) {
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = {
-                        if (route != null) TextButton(onClick = { route = null }) { Text("‹ 返回") }
+                        if (route != null) IconButton(onClick = { route = null }) {
+                            ResourceIcon(
+                                R.drawable.harmony_right,
+                                contentDescription = "返回",
+                                modifier = Modifier.size(24.dp).graphicsLayer(rotationZ = 180f),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
                     },
                     actions = {
                         if (route == null && selectedTab != MainTab.S_STATION) {
-                            TextButton(onClick = { route = AppRoute.Search }) { Text("搜索") }
+                            IconButton(onClick = { route = AppRoute.Search }) {
+                                ResourceIcon(
+                                    R.drawable.harmony_search,
+                                    contentDescription = "搜索",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
                         if (selectedTab != MainTab.PROFILE && route != AppRoute.Search) {
-                            TextButton(onClick = { refreshKey++ }) { Text("刷新") }
+                            IconButton(onClick = { refreshKey++ }) {
+                                ResourceIcon(
+                                    R.drawable.harmony_refresh,
+                                    contentDescription = "刷新",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
                     },
                 )
@@ -154,7 +180,17 @@ private fun DashboardApp(incomingLink: Uri?) {
                                     selectedTab = tab
                                     if (prefs.getBoolean("haptics", true)) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 },
-                                icon = { Text(tab.symbol, style = MaterialTheme.typography.titleLarge) },
+                                icon = {
+                                    ResourceIcon(
+                                        tab.drawable,
+                                        contentDescription = tab.title,
+                                        modifier = Modifier.size(26.dp),
+                                        tint = if (tab.tintable) {
+                                            if (selectedTab == tab) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        } else null,
+                                    )
+                                },
                                 label = { Text(tab.title) },
                             )
                         }
@@ -172,7 +208,17 @@ private fun DashboardApp(incomingLink: Uri?) {
                                     selectedTab = tab
                                     if (prefs.getBoolean("haptics", true)) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 },
-                                icon = { Text(tab.symbol, style = MaterialTheme.typography.titleLarge) },
+                                icon = {
+                                    ResourceIcon(
+                                        tab.drawable,
+                                        contentDescription = tab.title,
+                                        modifier = Modifier.size(26.dp),
+                                        tint = if (tab.tintable) {
+                                            if (selectedTab == tab) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        } else null,
+                                    )
+                                },
                                 label = { Text(tab.title) },
                             )
                         }

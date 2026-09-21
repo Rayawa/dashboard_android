@@ -35,6 +35,7 @@ import top.rayawa.dashboard.android.data.DeveloperRanking
 import top.rayawa.dashboard.android.data.MarketApp
 import top.rayawa.dashboard.android.data.MarketInfo
 import top.rayawa.dashboard.android.data.SortField
+import top.rayawa.dashboard.android.R
 import java.time.LocalTime
 
 @Composable
@@ -221,7 +222,12 @@ fun AppRow(app: MarketApp, onClick: () -> Unit, modifier: Modifier = Modifier) {
                 )
                 Text("收录于 ${compactDate(app.listedAt)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
-            Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.outline)
+            ResourceIcon(
+                R.drawable.harmony_right,
+                contentDescription = "打开${app.name}详情",
+                modifier = Modifier.width(20.dp).height(20.dp),
+                tint = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }
