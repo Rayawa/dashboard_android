@@ -1,8 +1,9 @@
 package top.rayawa.dashboard.android.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,18 +27,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.time.LocalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import top.rayawa.dashboard.android.R
 import top.rayawa.dashboard.android.data.DailyMaxDownload
 import top.rayawa.dashboard.android.data.DashboardApi
 import top.rayawa.dashboard.android.data.DeveloperRanking
 import top.rayawa.dashboard.android.data.MarketApp
 import top.rayawa.dashboard.android.data.MarketInfo
 import top.rayawa.dashboard.android.data.SortField
-import top.rayawa.dashboard.android.R
-import java.time.LocalTime
+import top.rayawa.dashboard.android.ui.theme.LocalDashboardPalette
 
 @Composable
 fun HomeScreen(
@@ -75,7 +82,7 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -91,6 +98,8 @@ fun HomeScreen(
             Text(
                 "欢迎来到 Dashboard 应用看板，探索 HarmonyOS 应用生态的最新动态。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
         if (loading && market == null) item { LoadingPane(text = "正在获取最新市场状态…") }
@@ -120,25 +129,25 @@ fun HomeScreen(
             item { Text("最近收录", style = MaterialTheme.typography.titleLarge) }
             items(recent, key = { it.appId }) { app -> AppRow(app = app, onClick = { openDetail(app) }) }
         }
-        item { Spacer(Modifier.height(84.dp)) }
     }
 }
 
 @Composable
-private fun MarketOverview(info: MarketInfo) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+internal fun MarketOverview(info: MarketInfo) {
+    val palette = LocalDashboardPalette.current
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         DashboardCard(Modifier.fillMaxWidth()) {
-            Text("应用总数", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("应用总数", style = MaterialTheme.typography.titleMedium)
             Text(formatCount(info.counts.apps + info.counts.atomicServices), style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth()) {
                 Stat("应用", info.counts.apps, Modifier.weight(1f))
-                Stat("元服务", info.counts.atomicServices, Modifier.weight(1f))
+                Stat("元服务", info.counts.atomicServices, Modifier.weight(1f), palette.cyan)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DashboardCard(Modifier.weight(1f)) { Stat("开发者", info.developerCount) }
-            DashboardCard(Modifier.weight(1f)) { Stat("专题", info.substanceCount) }
+            DashboardCard(Modifier.weight(1f)) { Stat("开发者", info.developerCount, color = palette.purple) }
+            DashboardCard(Modifier.weight(1f)) { Stat("专题", info.substanceCount, color = palette.orange) }
         }
         DashboardCard(Modifier.fillMaxWidth()) {
             Stat("最高装机量", info.counts.maxDownloadCount)
@@ -147,51 +156,75 @@ private fun MarketOverview(info: MarketInfo) {
 }
 
 @Composable
-private fun Stat(label: String, value: Long, modifier: Modifier = Modifier) {
-    Column(modifier) {
+private fun Stat(label: String, value: Long, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
-        Text(formatCount(value), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(formatCount(value), style = MaterialTheme.typography.headlineSmall, color = color)
     }
 }
 
 @Composable
-private fun SyncCard(info: MarketInfo) {
+internal fun SyncCard(info: MarketInfo) {
     val status = info.syncStatus
-    DashboardCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("同步信息", style = MaterialTheme.typography.titleMedium)
+    val palette = LocalDashboardPalette.current
+    DashboardCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(18.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("同步信息", style = MaterialTheme.typography.titleLarge)
             Text(
                 if (status.isSyncingAll) "全量同步中" else "服务正常",
-                color = if (status.isSyncingAll) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (status.isSyncingAll) palette.orange else palette.green,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(if (status.isSyncingAll) palette.warningBackground else palette.successBackground)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        if (status.progress.size >= 2 && status.progress[1] > 0) {
+        if (status.isSyncingAll && status.progress.size >= 2 && status.progress[1] > 0) {
             Spacer(Modifier.height(12.dp))
-            LinearProgressIndicator(
-                progress = { status.progress[0].toFloat() / status.progress[1] },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("进度 ${formatCount(status.progress[0])} / ${formatCount(status.progress[1])}", style = MaterialTheme.typography.labelMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LinearProgressIndicator(
+                    progress = { (status.progress[0].toFloat() / status.progress[1]).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    color = palette.blue, trackColor = palette.track, strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp, drawStopIndicator = {},
+                )
+                Text("进度 ${formatCount(status.progress[0])} / ${formatCount(status.progress[1])}",
+                    style = MaterialTheme.typography.bodySmall, color = palette.secondaryText)
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        Text("已处理 ${formatCount(status.totalProcessed)} · 新增 ${formatCount(status.totalInserted)} · 跳过 ${formatCount(status.totalSkipped)}")
-        Text("失败 ${formatCount(status.totalFailed)}", color = if (status.totalFailed > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-        status.elapsed?.let { Text("已用时 ${formatDuration(it.seconds)}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        status.nextSync?.let { Text("下次同步约 ${formatDuration(it.seconds)} 后", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        HorizontalDivider(Modifier.padding(vertical = 8.dp))
-        Text("最后更新：${compactDate(info.timestamp)} · 后端 ${info.crateVersion}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        val fields = listOf(
+            "已处理" to formatCount(status.totalProcessed), "新增" to formatCount(status.totalInserted),
+            "跳过" to formatCount(status.totalSkipped), "失败" to formatCount(status.totalFailed),
+            "已用时" to (status.elapsed?.let { formatDuration(it.seconds) } ?: "—"),
+            "预计总耗时" to (status.estimated?.let { formatDuration(it.seconds) } ?: "—"),
+        )
+        fields.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEach { (label, value) ->
+                    Text("$label：$value", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                        color = if (label == "失败" && status.totalFailed > 0) palette.red else palette.secondaryText)
+                }
+            }
+        }
+        status.nextSync?.let {
+            Text("下次同步约 ${formatDuration(it.seconds)} 后", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+        }
+        HorizontalDivider(Modifier.padding(vertical = 10.dp))
+        Text("最后更新：${compactDate(info.timestamp)}", style = MaterialTheme.typography.bodySmall, color = palette.secondaryText)
+        Text("后端版本：${info.crateVersion}", style = MaterialTheme.typography.bodySmall, color = palette.secondaryText)
     }
 }
 
 @Composable
 private fun RankingRow(title: String, subtitle: String, value: String, onClick: (() -> Unit)? = null) {
     DashboardCard(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        Modifier.fillMaxWidth(), onClick = onClick,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.width(12.dp))
             Text(value, color = MaterialTheme.colorScheme.primary)
@@ -201,19 +234,19 @@ private fun RankingRow(title: String, subtitle: String, value: String, onClick: 
 
 @Composable
 fun AppRow(app: MarketApp, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    DashboardCard(modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    DashboardCard(modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RemoteImage(app.iconUrl, "${app.name}图标", size = 58.dp)
-            Spacer(Modifier.width(14.dp))
+            RemoteImage(app.iconUrl, "${app.name}图标", size = 48.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(app.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, modifier = Modifier.weight(1f, false))
+                    Text(app.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false))
                     if (app.isAtomicService) {
                         Spacer(Modifier.width(6.dp))
                         Text("元服务", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
                     }
                 }
-                Text(app.developerName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(app.developerName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     "${app.kindName.ifBlank { app.kindTypeName }} · ★ ${app.fullAverageRating ?: app.averageRating ?: 0.0} · ${formatBytes(app.sizeBytes)}",
                     style = MaterialTheme.typography.labelSmall,

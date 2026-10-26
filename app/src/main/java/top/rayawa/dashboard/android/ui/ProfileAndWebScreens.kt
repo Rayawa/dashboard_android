@@ -2,10 +2,10 @@ package top.rayawa.dashboard.android.ui
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
-import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,24 +13,26 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -41,13 +43,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import top.rayawa.dashboard.android.R
 import top.rayawa.dashboard.android.data.DashboardApi
+import top.rayawa.dashboard.android.ui.DashboardButton as Button
+import top.rayawa.dashboard.android.ui.DashboardOutlinedButton as OutlinedButton
+import top.rayawa.dashboard.android.ui.DashboardTextButton as TextButton
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -56,7 +63,8 @@ fun SStationScreen(modifier: Modifier = Modifier) {
     var error by remember { mutableStateOf<String?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
-    BackHandler(canGoBack) { webView?.goBack() }
+    val haptics = LocalDashboardHaptics.current
+    BackHandler(canGoBack) { haptics.press(); webView?.goBack() }
 
     Column(modifier.fillMaxSize()) {
         if (progress in 1..99) LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
@@ -123,75 +131,66 @@ fun ProfileScreen(showNotice: () -> Unit, openDetailByPackage: (String) -> Unit,
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                ResourceIcon(R.drawable.harmony_app_icon, "Dashboard 应用图标", Modifier.size(100.dp))
-                Spacer(Modifier.height(8.dp))
-                Text("Dashboard应用看板", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                Text("原生 Android 客户端", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            ProfileIdentity()
         }
         item {
-            Text("设置", style = MaterialTheme.typography.titleLarge)
-            DashboardCard(Modifier.fillMaxWidth()) {
+            ProfileSection("设置") {
                 SettingRow("称呼", username.ifBlank { "未设置" }, R.drawable.harmony_user, onClick = { editName = true })
-                HorizontalDivider()
-                SwitchRow("触感反馈", "点击主要控件时振动", haptics, R.drawable.harmony_settings) {
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                SwitchRow("触感反馈", "点击主要控件时振动", haptics, R.drawable.dashboard_vibration) {
                     haptics = it; prefs.edit { putBoolean("haptics", it) }
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("清除缓存", "API 与网页缓存 ${formatBytes(cacheSize)}", R.drawable.harmony_trash) { confirmClear = true }
             }
         }
         item {
-            Text("帮助与项目", style = MaterialTheme.typography.titleLarge)
-            DashboardCard(Modifier.fillMaxWidth()) {
+            ProfileSection("帮助与项目") {
                 SettingRow("使用教程", "搜索、筛选与详情", R.drawable.harmony_tutorial) {
                     infoDialog = "使用教程" to "1. 首页展示市场总览、同步状态、排行榜与最近收录。\n\n2. 详情页的数据概况可查看评分、SDK 与下载增长；应用列表支持类型、字段、排序、分页和 AND/OR 高级组合搜索。\n\n3. 顶部搜索支持名称、包名、App ID 与应用市场链接，也可提交新应用或更新请求。\n\n4. 应用详情支持查看评分、截图、下载与评分趋势，并可打开应用市场、隐私政策或分享。\n\n5. 网络失败时会回退到本地 API 缓存，可在设置中清理。"
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("重要提示与隐私", "查看数据来源与隐私说明", R.drawable.harmony_attention, onClick = showNotice)
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("隐私政策", "本机数据与网络访问说明", R.drawable.harmony_privacy) {
                     infoDialog = "隐私政策" to "本应用不要求登录，不收集通讯录、位置、相册或麦克风数据。称呼、搜索历史和界面设置保存在本机。\n\n浏览市场信息时会向 Dashboard 后端请求公开数据并缓存响应；加载图标与截图时会访问华为应用图片服务器。提交应用时，应用标识、平台标识与用户填写的称呼会发送到 Dashboard 后端。\n\n你可以随时在设置中清除 API 缓存和网页数据。"
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("更新日志", "Android 1.0.0", R.drawable.harmony_app_log) {
-                    infoDialog = "更新日志" to "V1.0.0 · 2026-09-21\n\n• 首个 Android 原生版本\n• 对齐 S站、首页、详情与我的四个入口\n• 支持市场概览、同步状态、排行榜、数据图表与下载增长\n• 支持列表筛选、排序、分页和高级组合搜索\n• 支持原生搜索、投稿、应用详情、截图和趋势图\n• 支持离线 API 缓存、深链、响应式导航与 Material 3 动态配色"
+                    infoDialog = "更新日志" to "V1.0.0 · 2026-09-21\n\n• 首个 Android 原生版本\n• 对齐 S站、首页、详情与我的四个入口\n• 支持市场概览、同步状态、排行榜、数据图表与下载增长\n• 支持列表筛选、排序、分页和高级组合搜索\n• 支持原生搜索、投稿、应用详情、截图和趋势图\n• 支持离线 API 缓存、深链、响应式导航与鸿蒙一致的明暗配色"
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("联系我们", "邮箱与官方交流群", R.drawable.harmony_user) {
                     infoDialog = "联系我们" to "主要负责人：shenjack\n邮箱：3695888@qq.com\n\n应用开发：清霁·Rayawa\n邮箱：rayawa.work@outlook.com\n\nT站网页负责人：tianxiu2b2t\n邮箱：administrator@ttb-network.top\n\nHarmony Dashboard 官方交流群：757273833"
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("项目主页", "dashboard.rayawa.top", R.drawable.harmony_start_icon, false) { openExternal(context, "https://dashboard.rayawa.top/") }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("订阅 MeoW 频道", "项目动态与社区内容", R.drawable.harmony_link) { openExternal(context, "https://www.chuckfang.com/MeoW/appLinking?channelId=8bbba7f53bf9458284a41d04f295450b") }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("友情链接", "HarmonyOS 生态项目", R.drawable.harmony_link) {
                     showLinks = true
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("联系与赞助", "反馈问题或支持项目", R.drawable.harmony_sponsor) { openExternal(context, "https://afdian.com/a/shenjack") }
             }
         }
         item {
-            Text("关于", style = MaterialTheme.typography.titleLarge)
-            DashboardCard(Modifier.fillMaxWidth()) {
+            ProfileSection("关于") {
                 SettingRow("版本", "1.0.0 (1)", R.drawable.harmony_app_log) {
                     infoDialog = "开发者信息" to "Designed & Developed by Ray Chen (Rayawa)\nAndroid 原生版本使用 Kotlin 与 Jetpack Compose 构建。"
                 }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("后端 API", "ddns.shenjack.top:10003", R.drawable.harmony_api) { openExternal(context, "${DashboardApi.SITE_URL}docs") }
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                 SettingRow("京ICP备2025153453号", "本应用备案域名：rayawa.top", R.drawable.harmony_globe) { openExternal(context, "https://beian.miit.gov.cn/#/Integrated/index") }
             }
             Spacer(Modifier.height(16.dp))
             Text("Copyright © 2026. All rights reserved.", modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(84.dp))
         }
     }
 
@@ -253,14 +252,47 @@ fun ProfileScreen(showNotice: () -> Unit, openDetailByPackage: (String) -> Unit,
 }
 
 @Composable
-private fun SettingRow(
+internal fun ProfileIdentity() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ResourceIcon(R.drawable.harmony_start_icon, "Dashboard 应用图标",
+            Modifier.padding(bottom = 10.dp).size(100.dp).clip(RoundedCornerShape(22.dp)), tint = null)
+        Text("Dashboard应用看板", style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text("探索 HarmonyOS 应用生态", color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+internal fun ProfileSection(
+    title: String, modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp))
+        DashboardCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp), content = content)
+    }
+}
+
+@Composable
+internal fun SettingRow(
     title: String,
     subtitle: String,
     iconRes: Int? = null,
     tintIcon: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .clickable(role = Role.Button, onClick = rememberHapticAction(onClick))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         iconRes?.let {
             ResourceIcon(
                 it,
@@ -279,8 +311,17 @@ private fun SettingRow(
 }
 
 @Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, iconRes: Int? = null, onChecked: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+internal fun SwitchRow(title: String, subtitle: String, checked: Boolean, iconRes: Int? = null, onChecked: (Boolean) -> Unit) {
+    val haptics = LocalDashboardHaptics.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = {
+                onChecked(it)
+                haptics.press()
+            })
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         iconRes?.let {
             ResourceIcon(it, null, Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.size(12.dp))
@@ -289,7 +330,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, iconRes
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChecked)
+        Switch(checked = checked, onCheckedChange = null, modifier = Modifier.padding(start = 8.dp))
     }
 }
 

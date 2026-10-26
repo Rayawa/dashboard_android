@@ -4,12 +4,15 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +25,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,27 +35,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URI
 import java.text.DecimalFormat
-import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import top.rayawa.dashboard.android.ui.DashboardOutlinedButton as OutlinedButton
+import top.rayawa.dashboard.android.ui.theme.LocalDashboardPalette
 
 private val imageCache = object : LruCache<String, Bitmap>(24 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
 }
+
+internal val DashboardPagePadding = PaddingValues(start = 14.dp, top = 12.dp, end = 14.dp, bottom = 24.dp)
 
 fun formatCount(value: Long): String = when {
     value >= 100_000_000 -> DecimalFormat("0.##亿").format(value / 100_000_000.0)
@@ -86,13 +88,13 @@ fun formatDuration(seconds: Long): String {
 fun ResourceIcon(
     @DrawableRes drawable: Int,
     contentDescription: String?,
-    modifier: Modifier = Modifier.size(24.dp),
-    tint: Color? = null,
+    modifier: Modifier = Modifier,
+    tint: Color? = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     Image(
         painter = painterResource(drawable),
         contentDescription = contentDescription,
-        modifier = modifier,
+        modifier = modifier.size(24.dp),
         colorFilter = tint?.let(ColorFilter::tint),
         contentScale = ContentScale.Fit,
     )
@@ -101,14 +103,21 @@ fun ResourceIcon(
 @Composable
 fun DashboardCard(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(14.dp),
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = RoundedCornerShape(18.dp)
+    val clickModifier = if (onClick != null) {
+        Modifier.clip(shape).clickable(role = Role.Button, onClick = rememberHapticAction(onClick))
+    } else Modifier
     Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.then(clickModifier),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = shape,
+        border = BorderStroke(1.dp, LocalDashboardPalette.current.border),
     ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
+        Column(modifier = Modifier.padding(contentPadding), content = content)
     }
 }
 
@@ -121,6 +130,7 @@ fun RemoteImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     var bitmap by remember(url) { mutableStateOf(imageCache.get(url)) }
+    var loading by remember(url) { mutableStateOf(url.isNotBlank() && bitmap == null) }
     LaunchedEffect(url) {
         if (url.isBlank() || bitmap != null) return@LaunchedEffect
         bitmap = withContext(Dispatchers.IO) {
@@ -132,10 +142,13 @@ fun RemoteImage(
                 connection.inputStream.use(BitmapFactory::decodeStream).also { connection.disconnect() }
             }.getOrNull()?.also { imageCache.put(url, it) }
         }
+        loading = false
     }
     val sized = if (size != null) modifier.size(size) else modifier
     Box(
-        modifier = sized.clip(RoundedCornerShape(if (size != null) size / 4 else 16.dp))
+        modifier = sized.clip(RoundedCornerShape(if (size != null) {
+            if (size >= 80.dp) size * 0.22f else size / 4
+        } else 16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
     ) {
@@ -147,10 +160,13 @@ fun RemoteImage(
                 contentScale = contentScale,
                 modifier = Modifier.matchParentSize(),
             )
-        } else if (url.isNotBlank()) {
+        } else if (loading) {
             CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
         } else {
-            Text("APP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            ResourceIcon(
+                top.rayawa.dashboard.android.R.drawable.harmony_start_icon,
+                contentDescription, Modifier.matchParentSize(), tint = null,
+            )
         }
     }
 }
@@ -183,77 +199,6 @@ fun ErrorPane(message: String, retry: () -> Unit, modifier: Modifier = Modifier)
             )
             Spacer(Modifier.width(8.dp))
             Text("重试")
-        }
-    }
-}
-
-@Composable
-fun BarChart(
-    labels: List<String>,
-    values: List<Long>,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-) {
-    val maxValue = max(1L, values.maxOrNull() ?: 1L)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        labels.zip(values).forEach { (label, value) ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(label, style = MaterialTheme.typography.labelMedium)
-                    Text(formatCount(value), style = MaterialTheme.typography.labelMedium)
-                }
-                Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                    Box(
-                        Modifier.fillMaxWidth((value.toFloat() / maxValue).coerceIn(0f, 1f))
-                            .height(8.dp).background(color)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun LineChart(
-    values: List<Float>,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-) {
-    val grid = MaterialTheme.colorScheme.outlineVariant
-    Canvas(modifier = modifier.fillMaxWidth().height(180.dp)) {
-        if (values.isEmpty()) return@Canvas
-        for (i in 0..4) {
-            val y = size.height * i / 4f
-            drawLine(grid, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
-        }
-        val minValue = values.minOrNull() ?: 0f
-        val range = ((values.maxOrNull() ?: 1f) - minValue).takeIf { it > 0f } ?: 1f
-        val stepX = if (values.size == 1) 0f else size.width / (values.size - 1)
-        values.zipWithNext().forEachIndexed { index, pair ->
-            val start = Offset(index * stepX, size.height - ((pair.first - minValue) / range * size.height))
-            val end = Offset((index + 1) * stepX, size.height - ((pair.second - minValue) / range * size.height))
-            drawLine(color, start, end, strokeWidth = 5f, cap = StrokeCap.Round)
-        }
-        values.forEachIndexed { index, value ->
-            drawCircle(color, radius = 5f, center = Offset(index * stepX, size.height - ((value - minValue) / range * size.height)))
-        }
-    }
-}
-
-@Composable
-fun DonutChart(values: List<Long>, colors: List<Color>, modifier: Modifier = Modifier) {
-    val total = values.sum().coerceAtLeast(1)
-    Canvas(modifier = modifier.size(180.dp)) {
-        var start = -90f
-        values.forEachIndexed { index, value ->
-            val sweep = value.toFloat() / total * 360f
-            drawArc(
-                color = colors[index % colors.size], startAngle = start, sweepAngle = sweep,
-                useCenter = false, topLeft = Offset(12f, 12f),
-                size = Size(size.width - 24f, size.height - 24f),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 34f, cap = StrokeCap.Butt),
-            )
-            start += sweep
         }
     }
 }

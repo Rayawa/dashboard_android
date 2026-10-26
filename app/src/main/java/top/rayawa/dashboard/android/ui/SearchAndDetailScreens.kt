@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,14 +18,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,12 +37,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
-import top.rayawa.dashboard.android.R
 import kotlinx.coroutines.launch
+import top.rayawa.dashboard.android.R
 import top.rayawa.dashboard.android.data.AppDetail
 import top.rayawa.dashboard.android.data.DashboardApi
 import top.rayawa.dashboard.android.data.MarketApp
 import top.rayawa.dashboard.android.data.SortField
+import top.rayawa.dashboard.android.ui.DashboardAssistChip as AssistChip
+import top.rayawa.dashboard.android.ui.DashboardButton as Button
+import top.rayawa.dashboard.android.ui.DashboardOutlinedButton as OutlinedButton
+import top.rayawa.dashboard.android.ui.DashboardTextButton as TextButton
 
 @Composable
 fun SearchScreen(openDetail: (MarketApp) -> Unit, modifier: Modifier = Modifier) {
@@ -85,7 +86,7 @@ fun SearchScreen(openDetail: (MarketApp) -> Unit, modifier: Modifier = Modifier)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -134,7 +135,6 @@ fun SearchScreen(openDetail: (MarketApp) -> Unit, modifier: Modifier = Modifier)
                 items(recommendations, key = { it.appId }) { AppRow(it, { openDetail(it) }) }
             }
         }
-        item { Spacer(Modifier.height(84.dp)) }
     }
 
     if (showSubmit) SubmitDialog(
@@ -220,18 +220,20 @@ fun AppDetailScreen(
     val app = data.app
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         error?.let { item { Text("刷新失败，当前显示已有数据：$it", color = MaterialTheme.colorScheme.error) } }
         item {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RemoteImage(app.iconUrl, "${app.name}图标", size = 100.dp)
+            Column(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                RemoteImage(app.iconUrl, "${app.name}图标", modifier = Modifier.padding(bottom = 10.dp), size = 100.dp)
                 Text(app.name, style = MaterialTheme.typography.headlineMedium)
                 Text(app.developerName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Button(onClick = { openUrl(context, "https://appgallery.huawei.com/app/detail?id=${app.appId}") }) {
-                        ResourceIcon(R.drawable.harmony_start_icon, null, Modifier.size(20.dp))
+                        ResourceIcon(R.drawable.harmony_globe, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.size(8.dp))
                         Text("应用市场")
                     }
@@ -295,8 +297,10 @@ fun AppDetailScreen(
             item {
                 DashboardCard(Modifier.fillMaxWidth()) {
                     Text("下载量趋势", style = MaterialTheme.typography.titleLarge)
-                    Text("${compactDate(data.metrics.first().reportDate)} — ${compactDate(data.metrics.last().reportDate)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    LineChart(data.metrics.map { it.downloadCount.toFloat() }, Modifier.padding(top = 12.dp))
+                    val metrics = data.metrics.sortedBy { it.reportDate }
+                    Text("${compactDate(metrics.first().reportDate)} — ${compactDate(metrics.last().reportDate)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LineChart(metrics.map { it.downloadCount.toDouble() }, Modifier.padding(top = 12.dp),
+                        labels = metrics.map { it.reportDate })
                 }
             }
         }
@@ -304,11 +308,13 @@ fun AppDetailScreen(
             item {
                 DashboardCard(Modifier.fillMaxWidth()) {
                     Text("评分趋势", style = MaterialTheme.typography.titleLarge)
-                    LineChart(data.ratings.map { it.average.toFloat() }, Modifier.padding(top = 12.dp), MaterialTheme.colorScheme.tertiary)
+                    val ratings = data.ratings.sortedBy { it.reportDate }
+                    LineChart(ratings.map { it.average }, Modifier.padding(top = 12.dp),
+                        color = top.rayawa.dashboard.android.ui.theme.LocalDashboardPalette.current.orange,
+                        labels = ratings.map { it.reportDate }, unit = "分", fixedMaximum = 5.0)
                 }
             }
         }
-        item { Spacer(Modifier.height(32.dp)) }
     }
 }
 

@@ -1,2 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources />
+<resources>
+    <color name="dashboard_window_background">#F6F9FF</color>
+    <color name="dashboard_brand_background">#0C112D</color>
+</resources>

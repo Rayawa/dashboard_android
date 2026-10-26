@@ -1,7 +1,9 @@
 package top.rayawa.dashboard.android.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,13 +15,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,14 +31,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import top.rayawa.dashboard.android.data.AppType
 import top.rayawa.dashboard.android.data.AdvancedCondition
+import top.rayawa.dashboard.android.data.AppType
 import top.rayawa.dashboard.android.data.AppsPage
 import top.rayawa.dashboard.android.data.DashboardApi
 import top.rayawa.dashboard.android.data.DownloadGrowth
@@ -45,21 +45,45 @@ import top.rayawa.dashboard.android.data.FilterField
 import top.rayawa.dashboard.android.data.MarketApp
 import top.rayawa.dashboard.android.data.RatingDistribution
 import top.rayawa.dashboard.android.data.SdkDistribution
-import top.rayawa.dashboard.android.data.SortField
 import top.rayawa.dashboard.android.data.SearchOperator
+import top.rayawa.dashboard.android.data.SortField
+import top.rayawa.dashboard.android.ui.DashboardAssistChip as AssistChip
+import top.rayawa.dashboard.android.ui.DashboardButton as Button
+import top.rayawa.dashboard.android.ui.DashboardFilterChip as FilterChip
+import top.rayawa.dashboard.android.ui.DashboardOutlinedButton as OutlinedButton
+import top.rayawa.dashboard.android.ui.DashboardTextButton as TextButton
+import top.rayawa.dashboard.android.ui.theme.LocalDashboardPalette
 
-private enum class AppsMode(val label: String) { OVERVIEW("数据概况"), LIST("应用列表") }
+private enum class AppsMode(val label: String) { OVERVIEW("概况"), LIST("总表") }
 
 @Composable
 fun AppsScreen(refreshKey: Int, openDetail: (MarketApp) -> Unit, modifier: Modifier = Modifier) {
     var mode by remember { mutableStateOf(AppsMode.OVERVIEW) }
+    val haptics = LocalDashboardHaptics.current
     Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        val palette = LocalDashboardPalette.current
+        Surface(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            color = palette.surfaceAlt, shape = RoundedCornerShape(14.dp),
         ) {
-            AppsMode.entries.forEach { item ->
-                FilterChip(selected = mode == item, onClick = { mode = item }, label = { Text(item.label) })
+            Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                AppsMode.entries.forEach { item ->
+                    Surface(
+                        modifier = Modifier.weight(1f).selectable(mode == item, role = Role.Tab, onClick = {
+                            if (mode != item) {
+                                haptics.press()
+                                mode = item
+                            }
+                        }),
+                        color = if (mode == item) palette.surface else palette.surfaceAlt,
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Box(Modifier.padding(horizontal = 20.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                            Text(item.label, style = MaterialTheme.typography.titleSmall,
+                                color = if (mode == item) palette.blue else palette.secondaryText)
+                        }
+                    }
+                }
             }
         }
         if (mode == AppsMode.OVERVIEW) MarketInsights(refreshKey, Modifier.weight(1f))
@@ -98,7 +122,7 @@ private fun MarketInsights(refreshKey: Int, modifier: Modifier = Modifier) {
 
     LazyColumn(
         modifier = modifier,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -107,24 +131,33 @@ private fun MarketInsights(refreshKey: Int, modifier: Modifier = Modifier) {
         }
         if (loading && rating == null) item { LoadingPane(text = "正在加载统计数据…") }
         error?.let { item { ErrorPane(it, retry = { retryKey++ }) } }
-        rating?.let { data ->
-            item {
-                DashboardCard(Modifier.fillMaxWidth()) {
-                    Text("评分分布", style = MaterialTheme.typography.titleLarge)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val colors = listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFF44336))
-                        DonutChart(data.values, colors, Modifier.weight(1f))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            data.values.forEachIndexed { index, value ->
-                                Text("${5 - index} 星  ${formatCount(value)}", color = colors[index], style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
+        val sharedSdks = (minSdk + targetSdk).map { it.sdk }.distinct().sortedDescending()
+        if (targetSdk.isNotEmpty() || minSdk.isNotEmpty()) item {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 560.dp) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (targetSdk.isNotEmpty()) SdkCard("目标 SDK 分布", targetSdk, sharedSdks, Modifier.weight(1f))
+                        if (minSdk.isNotEmpty()) SdkCard("最低 SDK 分布", minSdk, sharedSdks, Modifier.weight(1f))
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (targetSdk.isNotEmpty()) SdkCard("目标 SDK 分布", targetSdk, sharedSdks)
+                        if (minSdk.isNotEmpty()) SdkCard("最低 SDK 分布", minSdk, sharedSdks)
                     }
                 }
             }
         }
-        if (minSdk.isNotEmpty()) item { SdkCard("最低 SDK 分布", minSdk) }
-        if (targetSdk.isNotEmpty()) item { SdkCard("目标 SDK 分布", targetSdk) }
+        rating?.let { data ->
+            item {
+                DashboardCard(Modifier.fillMaxWidth()) {
+                    Text("应用评分分布", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(10.dp))
+                    DistributionChart(data.values.mapIndexed { index, count ->
+                        DistributionEntry(if (index == 4) "1 星与无评分" else "${5 - index} 星", count, index)
+                    })
+                }
+            }
+        }
         item {
             DashboardCard(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -145,24 +178,26 @@ private fun MarketInsights(refreshKey: Int, modifier: Modifier = Modifier) {
                             Text(item.name, maxLines = 1)
                             Text("${item.priorDate.take(10)} → ${item.currentDate.take(10)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text("+${formatCount(item.increment)}", color = MaterialTheme.colorScheme.primary)
+                        Text("+${formatCount(item.increment)}", color = LocalDashboardPalette.current.green)
                     }
                 }
             }
         }
-        item { Spacer(Modifier.height(84.dp)) }
     }
 }
 
 @Composable
-private fun SdkCard(title: String, values: List<SdkDistribution>) {
-    DashboardCard(Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(12.dp))
-        BarChart(
-            labels = values.take(10).map { "API ${it.sdk}" },
-            values = values.take(10).map { it.count },
-        )
+private fun SdkCard(title: String, values: List<SdkDistribution>, sharedSdks: List<Int>, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    DashboardCard(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            if (values.map { it.sdk }.distinct().size > 7) {
+                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "收起" else "展开") }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        DistributionChart(sdkEntries(values, sharedSdks, expanded))
     }
 }
 
@@ -202,7 +237,7 @@ private fun MarketList(refreshKey: Int, openDetail: (MarketApp) -> Unit, modifie
 
     LazyColumn(
         modifier = modifier,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = DashboardPagePadding,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -260,7 +295,6 @@ private fun MarketList(refreshKey: Int, openDetail: (MarketApp) -> Unit, modifie
                 Button(onClick = { page++ }, enabled = page < totalPages && !loading) { Text("下一页") }
             }
         }
-        item { Spacer(Modifier.height(84.dp)) }
     }
 }
 

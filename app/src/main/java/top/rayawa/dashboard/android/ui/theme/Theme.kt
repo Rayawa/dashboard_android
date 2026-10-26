@@ -1,56 +1,54 @@
 package top.rayawa.dashboard.android.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
-)
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun DashboardAndroidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+    val palette = if (darkTheme) DarkDashboardPalette else LightDashboardPalette
+    val base = if (darkTheme) darkColorScheme() else lightColorScheme()
+    val colors = base.copy(
+        primary = palette.blue, onPrimary = if (darkTheme) palette.surfaceAlt else Color.White,
+        primaryContainer = palette.blue.copy(alpha = 0.12f), onPrimaryContainer = palette.blue,
+        secondary = palette.cyan, onSecondary = if (darkTheme) palette.surfaceAlt else Color.White,
+        secondaryContainer = palette.cyan.copy(alpha = 0.12f), onSecondaryContainer = palette.cyan,
+        tertiary = palette.green, onTertiary = if (darkTheme) palette.surfaceAlt else Color.White,
+        tertiaryContainer = palette.successBackground, onTertiaryContainer = palette.green,
+        background = palette.background, onBackground = palette.text,
+        surface = palette.surface, onSurface = palette.text,
+        surfaceVariant = palette.surfaceAlt, onSurfaceVariant = palette.secondaryText,
+        surfaceTint = Color.Transparent, surfaceDim = palette.surfaceAlt, surfaceBright = palette.surface,
+        surfaceContainerLowest = palette.surface, surfaceContainerLow = palette.surface,
+        surfaceContainer = palette.surfaceAlt, surfaceContainerHigh = palette.track,
+        surfaceContainerHighest = palette.track,
+        outline = palette.secondaryText, outlineVariant = palette.border,
+        error = palette.red, onError = if (darkTheme) palette.surfaceAlt else Color.White,
+        errorContainer = palette.red.copy(alpha = 0.12f), onErrorContainer = palette.red,
+        inverseSurface = if (darkTheme) LightDashboardPalette.text else DarkDashboardPalette.text,
+        inverseOnSurface = if (darkTheme) LightDashboardPalette.surface else DarkDashboardPalette.surface,
+        inversePrimary = if (darkTheme) LightDashboardPalette.blue else DarkDashboardPalette.blue,
     )
+    CompositionLocalProvider(LocalDashboardPalette provides palette) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = Typography,
+            shapes = Shapes(
+                extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
+                medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp),
+                extraLarge = RoundedCornerShape(24.dp),
+            ),
+            content = content,
+        )
+    }
 }

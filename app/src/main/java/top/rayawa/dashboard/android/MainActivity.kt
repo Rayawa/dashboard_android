@@ -13,16 +13,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,21 +34,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import top.rayawa.dashboard.android.data.DashboardApi
 import top.rayawa.dashboard.android.data.MarketApp
 import top.rayawa.dashboard.android.ui.AppDetailScreen
 import top.rayawa.dashboard.android.ui.AppsScreen
+import top.rayawa.dashboard.android.ui.DashboardHapticsProvider
+import top.rayawa.dashboard.android.ui.DashboardIconButton as IconButton
+import top.rayawa.dashboard.android.ui.DashboardTextButton as TextButton
 import top.rayawa.dashboard.android.ui.HomeScreen
 import top.rayawa.dashboard.android.ui.ImportantNoticeDialog
+import top.rayawa.dashboard.android.ui.LocalDashboardHaptics
 import top.rayawa.dashboard.android.ui.ProfileScreen
 import top.rayawa.dashboard.android.ui.ResourceIcon
 import top.rayawa.dashboard.android.ui.SStationScreen
 import top.rayawa.dashboard.android.ui.SearchScreen
 import top.rayawa.dashboard.android.ui.theme.DashboardAndroidTheme
+import top.rayawa.dashboard.android.ui.theme.LocalDashboardPalette
 
 class MainActivity : ComponentActivity() {
     private val deepLink = mutableStateOf<Uri?>(null)
@@ -57,7 +61,7 @@ class MainActivity : ComponentActivity() {
         DashboardApi.initialize(this)
         deepLink.value = intent?.data
         enableEdgeToEdge()
-        setContent { DashboardAndroidTheme { DashboardApp(deepLink.value) } }
+        setContent { DashboardAndroidTheme { DashboardHapticsProvider { DashboardApp(deepLink.value) } } }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -67,9 +71,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class MainTab(val title: String, val drawable: Int, val tintable: Boolean = true) {
-    S_STATION("S站", R.drawable.harmony_globe),
-    HOME("首页", R.drawable.harmony_start_icon, false),
+private enum class MainTab(val title: String, val drawable: Int) {
+    S_STATION("S站", R.drawable.dashboard_station),
+    HOME("首页", R.drawable.dashboard_home),
     APPS("详情", R.drawable.harmony_api),
     PROFILE("我的", R.drawable.harmony_user),
 }
@@ -83,7 +87,8 @@ private sealed interface AppRoute {
 @Composable
 private fun DashboardApp(incomingLink: Uri?) {
     val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
+    val palette = LocalDashboardPalette.current
+    val haptics = LocalDashboardHaptics.current
     val prefs = remember { context.getSharedPreferences("dashboard_settings", 0) }
     var selectedTab by remember { mutableStateOf(MainTab.HOME) }
     var route by remember { mutableStateOf<AppRoute?>(null) }
@@ -106,7 +111,7 @@ private fun DashboardApp(incomingLink: Uri?) {
             route = AppRoute.Detail(appId, packageName)
         }
     }
-    BackHandler(route != null) { route = null }
+    BackHandler(route != null) { haptics.press(); route = null }
 
     val title = when (val current = route) {
         AppRoute.Search -> "搜索应用"
@@ -137,7 +142,8 @@ private fun DashboardApp(incomingLink: Uri?) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(title) },
+                    title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.background),
                     navigationIcon = {
                         if (route != null) IconButton(onClick = { route = null }) {
                             ResourceIcon(
@@ -172,26 +178,30 @@ private fun DashboardApp(incomingLink: Uri?) {
             },
             bottomBar = {
                 if (!wide && route == null) {
-                    NavigationBar {
+                    NavigationBar(containerColor = palette.navigation, tonalElevation = 0.dp) {
                         MainTab.entries.forEach { tab ->
                             NavigationBarItem(
                                 selected = selectedTab == tab,
                                 onClick = {
-                                    selectedTab = tab
-                                    if (prefs.getBoolean("haptics", true)) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (selectedTab != tab) {
+                                        haptics.press()
+                                        selectedTab = tab
+                                    }
                                 },
                                 icon = {
                                     ResourceIcon(
                                         tab.drawable,
                                         contentDescription = tab.title,
-                                        modifier = Modifier.size(26.dp),
-                                        tint = if (tab.tintable) {
-                                            if (selectedTab == tab) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
-                                        } else null,
+                                        modifier = Modifier.size(24.dp),
+                                        tint = if (selectedTab == tab) palette.blue else palette.secondaryText,
                                     )
                                 },
                                 label = { Text(tab.title) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = palette.blue, selectedTextColor = palette.blue,
+                                    unselectedIconColor = palette.secondaryText, unselectedTextColor = palette.secondaryText,
+                                    indicatorColor = palette.blue.copy(alpha = 0.12f),
+                                ),
                             )
                         }
                     }
@@ -200,26 +210,30 @@ private fun DashboardApp(incomingLink: Uri?) {
         ) { padding ->
             if (wide && route == null) {
                 Row(Modifier.fillMaxSize().padding(padding)) {
-                    NavigationRail {
+                    NavigationRail(containerColor = palette.navigation) {
                         MainTab.entries.forEach { tab ->
                             NavigationRailItem(
                                 selected = selectedTab == tab,
                                 onClick = {
-                                    selectedTab = tab
-                                    if (prefs.getBoolean("haptics", true)) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (selectedTab != tab) {
+                                        haptics.press()
+                                        selectedTab = tab
+                                    }
                                 },
                                 icon = {
                                     ResourceIcon(
                                         tab.drawable,
                                         contentDescription = tab.title,
-                                        modifier = Modifier.size(26.dp),
-                                        tint = if (tab.tintable) {
-                                            if (selectedTab == tab) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
-                                        } else null,
+                                        modifier = Modifier.size(24.dp),
+                                        tint = if (selectedTab == tab) palette.blue else palette.secondaryText,
                                     )
                                 },
                                 label = { Text(tab.title) },
+                                colors = NavigationRailItemDefaults.colors(
+                                    selectedIconColor = palette.blue, selectedTextColor = palette.blue,
+                                    unselectedIconColor = palette.secondaryText, unselectedTextColor = palette.secondaryText,
+                                    indicatorColor = palette.blue.copy(alpha = 0.12f),
+                                ),
                             )
                         }
                     }
